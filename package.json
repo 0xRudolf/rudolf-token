@@ -1,0 +1,40 @@
+{
+  "name": "rudolf-token",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "npm run clean && npm run compile",
+    "clean": "npx hardhat clean",
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "test:only": "TS_NODE_TRANSPILE_ONLY=1 npx hardhat test",
+    "format": "npm run format:ts && npm run format:sol",
+    "format:ts": "prettier --config .prettierrc.json --write **/*.ts",
+    "format:sol": "prettier --config .prettierrc.json --write contracts/*.sol"
+  },
+  "keywords": [
+    "rudolf",
+    "token",
+    "smartcontract"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@openzeppelin/contracts": "^4.3.3",
+    "@typechain/ethers-v5": "^7.0.0",
+    "@typechain/hardhat": "^2.0.0",
+    "@types/chai": "^4.2.22",
+    "@types/mocha": "^9.0.0",
+    "@types/node": "^16.11.7",
+    "chai": "^4.3.4",
+    "ethers": "^5.5.1",
+    "hardhat": "^2.6.8",
+    "prettier": "^2.4.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "ts-node": "^10.4.0",
+    "typechain": "^5.0.0",
+    "typescript": "^4.4.4"
+  }
+}
