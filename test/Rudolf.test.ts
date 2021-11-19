@@ -16,10 +16,11 @@ let initialState: number;
 const decimals = 18;
 const withDecimals = (n: number | BigNumber): BigNumber => BigNumber.from(n).mul(BigNumber.from(10).pow(decimals));
 const withoutDecimals = (n: BigNumber): number => parseFloat(ethers.utils.formatUnits(n, decimals));
-
 const supply: BigNumber = withDecimals(4200000000);
 const xmasAirDropAmount: BigNumber = withDecimals(1200000000);
 const xmas2021 = 1640390400;
+const yearInSeconds = 365 * 24 * 3600;
+const endOfYear = 360 * 24 * 3600;
 describe("Rudolf", function () {
   before(async function () {
     rudolfFactory = await ethers.getContractFactory("Rudolf");
@@ -28,11 +29,14 @@ describe("Rudolf", function () {
   });
 
   beforeEach(async function () {
-    //always revert and recreate an initialState snapshot for next test
-    await ethers.provider.send("evm_revert", [initialState]);
     rudolf = await rudolfFactory.deploy();
     await rudolf.deployed();
     initialState = await ethers.provider.send("evm_snapshot", []);
+  });
+
+  afterEach(async () => {
+    //always revert to initialState snapshot for next test
+    await ethers.provider.send("evm_revert", [initialState]);
   });
 
   describe("constructor()", () => {
@@ -118,14 +122,9 @@ describe("Rudolf", function () {
     });
   });
 
-  describe("getClaimableXmasAirdropAmoutForAccount()", () => {
-    /* beforeEach(async () => {
-      await rudolf.transfer(user1.address, 1000000000);
-      await rudolf.transfer(user2.address, 1000000000);
-    });*/
-
+  describe("getClaimableXmasAirdropAmountForAccount()", () => {
     it("Nothing is claimable before Xmas", async () => {
-      const amount = await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address);
+      const amount = await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address);
       expect(amount).to.equal(0);
     });
   });
@@ -142,7 +141,6 @@ describe("Rudolf", function () {
         await ethers.provider.send("evm_mine", [xmas2021]);
       });
 
-      //it("Block time is updated to Y+1", async () => {
       it("Block time is updated to Xmas time", async () => {
         const blockNum = await ethers.provider.getBlockNumber();
         const block = await ethers.provider.getBlock(blockNum);
@@ -183,7 +181,7 @@ describe("Rudolf", function () {
         user1ExpectedAirdrop = xmasAirDropAmount.mul(user1BalanceBeforeXmas).div(supply);
         user2ExpectedAirdrop = xmasAirDropAmount.mul(user2BalanceBeforeXmas).div(supply);
 
-        await ethers.provider.send("evm_mine", [xmas2021]);
+        await ethers.provider.send("evm_mine", [xmas2021 + endOfYear]); //go to endOfYear to get full airdrop allocation
         await rudolf.transfer(user3.address, 1);
       });
 
@@ -194,24 +192,24 @@ describe("Rudolf", function () {
 
       it("Next XmasAirdrop is moved to next year", async () => {
         expect(await rudolf.getNextXmasYear()).to.equal(2022);
-        expect(await rudolf.getNextXmasAirdropTime()).to.equal(xmas2021 + 365 * 24 * 3600);
+        expect(await rudolf.getNextXmasAirdropTime()).to.equal(xmas2021 + yearInSeconds);
       });
 
       it("Accounts have XmasAirdrop claimable amount calculated based on their Xmas balance", async () => {
-        const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address);
+        const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address);
         expect(ownerAirdrop).to.equal(ownerExpectedAirdrop);
 
-        const user1Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address);
+        const user1Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address);
         expect(user1Airdrop).to.equal(user1ExpectedAirdrop);
 
-        const user2Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address);
+        const user2Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address);
         expect(user2Airdrop).to.equal(user2ExpectedAirdrop);
       });
 
       it("XmasAirdrop total claimable is equal to XmasAirdrop emission", async () => {
-        let total = await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address);
-        total = total.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address));
-        total = total.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address));
+        let total = await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address);
+        total = total.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address));
+        total = total.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address));
         expect(withoutDecimals(total)).to.equal(withoutDecimals(xmasAirDropAmount));
       });
 
@@ -229,16 +227,24 @@ describe("Rudolf", function () {
         expect(await rudolf.balanceOf(user2.address)).to.equal(user2Balance.add(user2ExpectedAirdrop));
       });
 
+      it("Successive claim are rejected", async () => {
+        const user1Balance = await rudolf.balanceOf(user1.address);
+        await rudolf.connect(user1).claimXmasAirdrop();
+        await expect(rudolf.connect(user1).claimXmasAirdrop()).to.be.revertedWith("RUDOLF: nothing to claim");
+        await expect(rudolf.connect(user1).claimXmasAirdrop()).to.be.revertedWith("RUDOLF: nothing to claim");
+        expect(await rudolf.balanceOf(user1.address)).to.equal(user1Balance.add(user1ExpectedAirdrop));
+      });
+
       it("Total supply is increase each time an account claim its airdrop", async () => {
-        let claimedAmount = await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address);
+        let claimedAmount = await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address);
         await rudolf.claimXmasAirdrop();
         expect(await rudolf.totalSupply()).to.equal(supply.add(claimedAmount));
 
-        claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address));
+        claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address));
         await rudolf.connect(user1).claimXmasAirdrop();
         expect(await rudolf.totalSupply()).to.equal(supply.add(claimedAmount));
 
-        claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address));
+        claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address));
         await rudolf.connect(user2).claimXmasAirdrop();
         expect(await rudolf.totalSupply()).to.equal(supply.add(claimedAmount));
       });
@@ -266,7 +272,7 @@ describe("Rudolf", function () {
           await rudolf.transfer(user3.address, 1);
           await rudolf.connect(user3).transfer(owner.address, 1);
           nextTime = await rudolf.getNextXmasAirdropTime();
-          await ethers.provider.send("evm_mine", [nextTime]);
+          await ethers.provider.send("evm_mine", [nextTime + endOfYear]); //go to endOfYear to get full airdrop allocation
           await rudolf.transfer(user3.address, 1);
           await rudolf.connect(user3).transfer(owner.address, 1);
         });
@@ -280,29 +286,29 @@ describe("Rudolf", function () {
           expect(await rudolf.getNextXmasYear()).to.equal(2026);
           expect(await rudolf.getNextXmasAirdropTime()).to.equal(
             xmas2021 +
-              365 * 24 * 3600 + //2022
-              365 * 24 * 3600 + //2023
-              366 * 24 * 3600 + //2024 is a leap year
-              365 * 24 * 3600 + //2025
-              365 * 24 * 3600 //2026
+              yearInSeconds + //2022
+              yearInSeconds + //2023
+              (yearInSeconds + 24 * 3600) + //2024 is a leap year
+              yearInSeconds + //2025
+              yearInSeconds //2026
           );
         });
 
         it("Accounts have 5 time XmasAirdrop claimable amount", async () => {
-          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address);
+          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address);
           expect(ownerAirdrop).to.equal(ownerExpectedAirdrop.mul(5));
 
-          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address);
+          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address);
           expect(user1Airdrop).to.equal(user1ExpectedAirdrop.mul(5));
 
-          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address);
+          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address);
           expect(user2Airdrop).to.equal(user2ExpectedAirdrop.mul(5));
         });
 
         it("XmasAirdrop total claimable is equal to 5 XmasAirdrop emission", async () => {
-          let total = await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address);
-          total = total.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address));
-          total = total.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address));
+          let total = await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address);
+          total = total.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address));
+          total = total.add(await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address));
           expect(withoutDecimals(total)).to.equal(withoutDecimals(xmasAirDropAmount.mul(5)));
         });
 
@@ -322,15 +328,15 @@ describe("Rudolf", function () {
 
         it("Total supply is increase each time an account claim its airdrop", async () => {
           let claimedAmount: BigNumber = BigNumber.from(0);
-          claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address));
+          claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address));
           await rudolf.claimXmasAirdrop();
           expect(await rudolf.totalSupply()).to.equal(supply.add(claimedAmount));
 
-          claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address));
+          claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address));
           await rudolf.connect(user1).claimXmasAirdrop();
           expect(await rudolf.totalSupply()).to.equal(supply.add(claimedAmount));
 
-          claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address));
+          claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address));
           await rudolf.connect(user2).claimXmasAirdrop();
           expect(await rudolf.totalSupply()).to.equal(supply.add(claimedAmount));
         });
@@ -367,25 +373,25 @@ describe("Rudolf", function () {
           user2Expected2ndAirdrop = xmasAirDropAmount.mul(user2BalanceBefore2ndXmas).div(supply);
 
           const nextTime = await rudolf.getNextXmasAirdropTime();
-          await ethers.provider.send("evm_mine", [nextTime]);
+          await ethers.provider.send("evm_mine", [nextTime + endOfYear]); //go to endOfYear to get full airdrop allocation
           await rudolf.transfer(user3.address, 1);
         });
 
         it("Claimable XmasAirdrop amount are calculated based on each Xmas balances", async () => {
-          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address);
+          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address);
           expect(user1Airdrop).to.equal(user1ExpectedAirdrop.add(user1Expected2ndAirdrop));
 
-          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address);
+          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address);
           expect(user2Airdrop).to.equal(user2ExpectedAirdrop.add(user2Expected2ndAirdrop));
 
-          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address);
+          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address);
           expect(ownerAirdrop).to.equal(ownerExpectedAirdrop.add(ownerExpected2ndAirdrop));
         });
 
         it("XmasAirdrop total claimable is equal to 2 XmasAirdrop emission", async () => {
-          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address);
-          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address);
-          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address);
+          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address);
+          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address);
+          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address);
           expect(withoutDecimals(user1Airdrop.add(user2Airdrop).add(ownerAirdrop))).to.equal(
             withoutDecimals(xmasAirDropAmount.mul(2))
           );
@@ -444,18 +450,18 @@ describe("Rudolf", function () {
           user2Expected2ndAirdrop = xmasAirDropAmount.mul(user2BalanceBefore2ndXmas).div(newSupply);
 
           const nextTime = await rudolf.getNextXmasAirdropTime();
-          await ethers.provider.send("evm_mine", [nextTime]);
+          await ethers.provider.send("evm_mine", [nextTime + endOfYear]); //go to endOfYear to get full airdrop allocation
           await rudolf.transfer(user3.address, 1);
         });
 
         it("Claimable XmasAirdrop amount are calculated based on each Xmas balances", async () => {
-          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(owner.address);
+          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address);
           expect(ownerAirdrop).to.equal(ownerExpected2ndAirdrop);
 
-          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user1.address);
+          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address);
           expect(user1Airdrop).to.equal(user1Expected2ndAirdrop);
 
-          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmoutForAccount(user2.address);
+          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address);
           expect(user2Airdrop).to.equal(user2ExpectedAirdrop.add(user2Expected2ndAirdrop));
         });
 
