@@ -1,12 +1,13 @@
 # $Rudolf Token Smart Contract
 
-$Rudolf is Xmas meme coin
+$Rudolf is the Xmas meme coin
 <br/>
 
 ## $Rudolf tokenomics:
 - Initial Supply: 4.2B $RUDOLF
 - Controlled inflation: 1.2B $RUDOLF / year
 - Innovative token emission model: 1.2B $RUDOLF airdrop to hodlers every Xmas! #XmasAirdrop
+- Xmas Airdrop is linearly vested over 12 month to avoid supply choc
 - 0% fees
 
 ## Dependencies
@@ -33,7 +34,7 @@ npm install
 
 2. Run test suites
 ```
-npx run test
+npm run test
 ```
 <br/>
 
@@ -49,7 +50,7 @@ npx hardhat node
 
 2. Deploy contracts to the local network
 ```
-npx hardhat run --network localhost scripts/deploy.js
+npx hardhat run --network localhost scripts/deploy.ts
 ```
 
 3. Interact with the contract on local hardhat network
