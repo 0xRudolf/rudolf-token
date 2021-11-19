@@ -1,19 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
+//import "hardhat/console.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
 
 contract Rudolf is ERC20, ERC20Snapshot {
   uint256 private constant INITIAL_SUPPLY = 4.2 * 10**9;
   uint256 private constant XMAS_AIRDROP_EMMISSION = 1.2 * 10**9;
+  uint32 private constant AVG_MONTH_IN_SECONDS = 2628000;
   uint32 private constant YEAR_IN_SECONDS = 31536000;
   uint32 private constant LEAP_YEAR_IN_SECONDS = 31622400;
   uint16 private _nextXmasYear = 2021;
   uint32 private _nextXmasTimestamp = 1640390400;
+  uint32 private _lastXmasTimestamp = 0;
   uint8[] private _xmasSnapshotsIds;
   mapping(address => uint256) private _claimedXmasAirdrop;
+
+  struct VestedAirdrop {
+    uint256 releaseTime;
+    uint256 amount;
+  }
 
   event XmasAirdrop(uint16 year, uint256 emission);
 
@@ -26,10 +34,14 @@ contract Rudolf is ERC20, ERC20Snapshot {
     address to,
     uint256 amount
   ) internal override(ERC20, ERC20Snapshot) {
+    _checkXmasAirdrop();
+    super._beforeTokenTransfer(from, to, amount);
+  }
+
+  function _checkXmasAirdrop() private {
     if (_isXmasAirdropTime()) {
       _generateXmasSnapshot();
     }
-    super._beforeTokenTransfer(from, to, amount);
   }
 
   function _isXmasAirdropTime() private view returns (bool) {
@@ -41,6 +53,7 @@ contract Rudolf is ERC20, ERC20Snapshot {
     _xmasSnapshotsIds.push(snapshotId);
     emit XmasAirdrop(_nextXmasYear, XMAS_AIRDROP_EMMISSION * 10**decimals());
     _nextXmasYear = _nextXmasYear + 1;
+    _lastXmasTimestamp = _nextXmasTimestamp;
     if (_isLeapYear(_nextXmasYear)) {
       _nextXmasTimestamp = _nextXmasTimestamp + LEAP_YEAR_IN_SECONDS;
     } else {
@@ -77,7 +90,7 @@ contract Rudolf is ERC20, ERC20Snapshot {
     return true;
   }
 
-  function getClaimableXmasAirdropAmoutForAccount(address account) public view returns (uint256) {
+  function getClaimableXmasAirdropAmountForAccount(address account) public view returns (uint256) {
     uint256 claimableAmount = 0;
     uint256 nbSnapshots = _xmasSnapshotsIds.length;
     for (uint256 i = 0; i < nbSnapshots; i++) {
@@ -86,23 +99,47 @@ contract Rudolf is ERC20, ERC20Snapshot {
       if (balance > 0) {
         uint256 supply = totalSupplyAt(snapshotId);
         //XMAS_AIRDROP_EMMISSION is divided between all accounts proportionally to their snapshot holding
-        claimableAmount += (balance * XMAS_AIRDROP_EMMISSION * 10**decimals()) / supply;
+        uint256 yearAmount = (balance * XMAS_AIRDROP_EMMISSION * 10**decimals()) / supply;
+        if (i == nbSnapshots - 1) {
+          //Current year XmasAirdrop are released lienarly over 12 month
+          uint256 elapsedTime = Math.min(block.timestamp, (_nextXmasTimestamp - 1)) - _lastXmasTimestamp;
+          uint256 elapsedMonths = elapsedTime / AVG_MONTH_IN_SECONDS;
+          yearAmount = (yearAmount * (elapsedMonths + 1)) / 12;
+        }
+        claimableAmount += yearAmount;
       }
-
-      //TODO if last snapshot id, calculate current year progress to determine current claimable amount
     }
     return claimableAmount - _claimedXmasAirdrop[account];
   }
 
-  //TODO add getVestedeXmasAirdropAmoutForAccount(address account)
-  //implement 12 month linear vesting for xmas airdrop
-  //return array struct (timestamp, amount)
+  function getVestedXmasAirdropAmountForAccount(address account) public view returns (VestedAirdrop[] memory) {
+    VestedAirdrop[] memory vestedAirdrops;
+    uint8 snapshotId = getLastXmasAirdropSnapshotId();
+    if (snapshotId > 0) {
+      uint256 balance = balanceOfAt(account, snapshotId);
+      if (balance > 0) {
+        uint256 supply = totalSupplyAt(snapshotId);
+        uint256 yearAmount = (balance * XMAS_AIRDROP_EMMISSION * 10**decimals()) / supply;
+        uint256 monthAmount = yearAmount / 12;
+        uint256 elapsedTime = Math.min(block.timestamp, (_nextXmasTimestamp - 1)) - _lastXmasTimestamp;
+        uint256 elapsedMonths = (elapsedTime / AVG_MONTH_IN_SECONDS) + 1;
+        uint256 remainingMonths = 12 - elapsedMonths;
+        vestedAirdrops = new VestedAirdrop[](remainingMonths);
+        for (uint256 i = 0; i < remainingMonths; i++) {
+          uint256 releaseTime = _lastXmasTimestamp + ((i + elapsedMonths) * AVG_MONTH_IN_SECONDS);
+          vestedAirdrops[i] = VestedAirdrop(releaseTime, monthAmount);
+        }
+      }
+    }
+
+    return vestedAirdrops;
+  }
 
   function claimXmasAirdrop() public {
-    uint256 amount = getClaimableXmasAirdropAmoutForAccount(msg.sender);
+    _checkXmasAirdrop();
+    uint256 amount = getClaimableXmasAirdropAmountForAccount(msg.sender);
     require(amount != 0, "RUDOLF: nothing to claim");
     _claimedXmasAirdrop[msg.sender] = amount;
-    //TODO add 12 month linear vesting
     _mint(msg.sender, amount);
   }
 }
