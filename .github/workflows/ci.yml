@@ -26,8 +26,11 @@ jobs:
           restore-keys: node-modules-${{ runner.OS }}-
 
       - name: npm install
-        run: |
-          npm install
+        run: npm install
+        env:
+          NODE_ENV: test
 
       - name: npm test
         run: npm test
+        env:
+          NODE_ENV: test
