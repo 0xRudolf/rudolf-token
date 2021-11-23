@@ -4,9 +4,11 @@ pragma solidity ^0.8.0;
 //import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
 
-contract Rudolf is ERC20, ERC20Snapshot {
+contract Rudolf is Ownable, ERC20, ERC20Snapshot, ERC20Pausable {
   uint256 private constant INITIAL_SUPPLY = 4.2 * 10**9;
   uint256 private constant XMAS_AIRDROP_EMMISSION = 1.2 * 10**9;
   uint32 private constant AVG_MONTH_IN_SECONDS = 2628000;
@@ -29,11 +31,19 @@ contract Rudolf is ERC20, ERC20Snapshot {
     _mint(msg.sender, INITIAL_SUPPLY * 10**decimals());
   }
 
+  function pause() public onlyOwner {
+    _pause();
+  }
+
+  function unpause() public onlyOwner {
+    _unpause();
+  }
+
   function _beforeTokenTransfer(
     address from,
     address to,
     uint256 amount
-  ) internal override(ERC20, ERC20Snapshot) {
+  ) internal override(ERC20, ERC20Snapshot, ERC20Pausable) {
     _checkXmasAirdrop();
     super._beforeTokenTransfer(from, to, amount);
   }
@@ -135,7 +145,7 @@ contract Rudolf is ERC20, ERC20Snapshot {
     return vestedAirdrops;
   }
 
-  function claimXmasAirdrop() public {
+  function claimXmasAirdrop() public whenNotPaused {
     _checkXmasAirdrop();
     uint256 amount = getClaimableXmasAirdropAmountForAccount(msg.sender);
     require(amount != 0, "RUDOLF: nothing to claim");
