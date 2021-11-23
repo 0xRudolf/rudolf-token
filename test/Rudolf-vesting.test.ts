@@ -21,14 +21,14 @@ const xmasAirDropAmount: BigNumber = withDecimals(1200000000);
 const xmas2021 = 1640390400;
 const monthInSeconds = 2628000;
 const yearInSeconds = 365 * 24 * 3600;
-describe("Rudolf Vesting", function () {
-  before(async function () {
+describe("Rudolf Vesting", () => {
+  before(async () => {
     rudolfFactory = await ethers.getContractFactory("Rudolf");
     [owner, user1, user2, user3] = await ethers.getSigners();
     initialState = await ethers.provider.send("evm_snapshot", []);
   });
 
-  beforeEach(async function () {
+  beforeEach(async () => {
     rudolf = await rudolfFactory.deploy();
     await rudolf.deployed();
     initialState = await ethers.provider.send("evm_snapshot", []);
