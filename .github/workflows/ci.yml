@@ -1,0 +1,33 @@
+name: Rudolf CI
+
+on:
+  push:
+    branches: [ master ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: use node.js 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: "14.x"
+
+      - name: use cached node modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.OS }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: node-modules-${{ runner.OS }}-
+
+      - name: npm install
+        run: |
+          npm install
+
+      - name: npm test
+        run: npm test
