@@ -10,6 +10,11 @@ $Rudolf is the Xmas meme coin
 - Xmas Airdrop is linearly vested over 12 month to avoid supply choc
 - 0% fees
 
+## Security:
+- Rudolf is an immutable contract, no update mechanism is implemented
+- In case of emergency, the contract is pauseable, by the deployer only
+- Deployer can renounce ownership to make it un-pauseable
+
 ## Dependencies
 
 This project uses:
