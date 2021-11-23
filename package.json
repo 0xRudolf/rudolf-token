@@ -6,8 +6,7 @@
     "build": "npm run clean && npm run compile",
     "clean": "npx hardhat clean",
     "compile": "npx hardhat compile",
-    "test": "npx hardhat test",
-    "test:only": "TS_NODE_TRANSPILE_ONLY=1 npx hardhat test",
+    "test": "TS_NODE_TRANSPILE_ONLY=1 npx hardhat compile && npx hardhat test",
     "format": "npm run format:ts && npm run format:sol",
     "format:ts": "prettier --config .prettierrc.json --write **/*.ts",
     "format:sol": "prettier --config .prettierrc.json --write contracts/*.sol"
