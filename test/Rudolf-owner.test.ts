@@ -11,7 +11,7 @@ let user1: SignerWithAddress;
 let user2: SignerWithAddress;
 let user3: SignerWithAddress;
 let initialState: number;
-describe("Rudolf Owner",  () => {
+describe("Rudolf Owner", () => {
   before(async () => {
     rudolfFactory = await ethers.getContractFactory("Rudolf");
     [owner, user1, user2, user3] = await ethers.getSigners();
