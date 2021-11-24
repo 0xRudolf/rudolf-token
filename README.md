@@ -45,8 +45,10 @@ npm run test
 
 ## Deployment
 
-Follow these steps to compile and deploy Rudolf Token contract on a local network.  
+Follow these steps to deploy Rudolf on local network, BSC testnet or BSC mainnet.  
 <br/>
+
+### Local Network
 
 1. Run local hardhat network on a separate tab
 ```
@@ -63,3 +65,62 @@ npx hardhat run --network localhost scripts/deploy.ts
 npx hardhat console --network localhost
 >  ...
 ```
+
+<br/>
+
+### BSC Testnet
+
+1. Generate a new testnet account
+```
+npm run accounts:generate
+```
+
+2. Copy the address output of the previous command `0x.......`
+
+3. Open [BSC testnet faucet](https://testnet.binance.org/faucet-smart) to claim some testnet BNB for your address
+
+4.  Deploy contracts to the BSC testnet
+```
+npx hardhat run --network bsc_testnet scripts/deploy.ts
+```
+
+<br/>
+
+### BSC Mainnet
+
+1. Put your account credentials in `secrets/accounts.mainnet.json`
+
+```
+{
+  "mnemonics": "word1 word2 ...",
+  "path: "m/44'/60'/0'/0"
+}
+```
+
+2.  Deploy contracts to the BSC mainnet
+```
+npx hardhat run --network bsc_mainnet scripts/deploy.ts
+```
+
+
+## Verify Contract
+
+Follow these steps to verify Rudolf on [BSCScan](https://bscscan.com/).  
+<br/>
+
+
+1. Request an [API KEY on BSCScan](https://bscscan.com/myapikey)
+
+2. Copy your API KEY in `secrets/etherscan.json`
+```
+{
+  "apiKey": "...YOUR_API_KEY...",
+}
+```
+
+3. Run the following command with the address of your previously deployed contract:
+```
+npx hardhat  verify --network bsc_testnet "0x...."
+```
+
+To verify on mainnet, change `--network bsc_testnet` with `--network bsc_mainnet`
