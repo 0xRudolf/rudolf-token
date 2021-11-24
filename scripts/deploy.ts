@@ -1,8 +1,8 @@
-import { run, ethers } from "hardhat";
+import { ethers } from "hardhat";
 
 async function main() {
-  await run("compile");
   const Rudolf = await ethers.getContractFactory("Rudolf");
+  console.log("Deployer address:", (await ethers.getSigners())[0].address);
   console.log("Deploying Rudolf...");
   const rudolf = await Rudolf.deploy();
   await rudolf.deployed();
