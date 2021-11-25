@@ -9,8 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
 
 contract Rudolf is Ownable, ERC20, ERC20Snapshot, ERC20Pausable {
-  uint256 private constant INITIAL_SUPPLY = 4.2 * 10**9;
-  uint256 private constant XMAS_AIRDROP_EMMISSION = 1.2 * 10**9;
+  uint256 private constant INITIAL_SUPPLY = 420_000_000_000;
+  uint256 private constant XMAS_AIRDROP_EMISSION = 120_000_000_000;
   uint32 private constant AVG_MONTH_IN_SECONDS = 2628000;
   uint32 private constant YEAR_IN_SECONDS = 31536000;
   uint32 private constant LEAP_YEAR_IN_SECONDS = 31622400;
@@ -61,7 +61,7 @@ contract Rudolf is Ownable, ERC20, ERC20Snapshot, ERC20Pausable {
   function _generateXmasSnapshot() private {
     uint8 snapshotId = uint8(_snapshot());
     _xmasSnapshotsIds.push(snapshotId);
-    emit XmasAirdrop(_nextXmasYear, XMAS_AIRDROP_EMMISSION * 10**decimals());
+    emit XmasAirdrop(_nextXmasYear, XMAS_AIRDROP_EMISSION * 10**decimals());
     _nextXmasYear = _nextXmasYear + 1;
     _lastXmasTimestamp = _nextXmasTimestamp;
     if (_isLeapYear(_nextXmasYear)) {
@@ -108,8 +108,8 @@ contract Rudolf is Ownable, ERC20, ERC20Snapshot, ERC20Pausable {
       uint256 balance = balanceOfAt(account, snapshotId);
       if (balance > 0) {
         uint256 supply = totalSupplyAt(snapshotId);
-        //XMAS_AIRDROP_EMMISSION is divided between all accounts proportionally to their snapshot holding
-        uint256 yearAmount = (balance * XMAS_AIRDROP_EMMISSION * 10**decimals()) / supply;
+        //XMAS_AIRDROP_EMISSION is divided between all accounts proportionally to their snapshot holding
+        uint256 yearAmount = (balance * XMAS_AIRDROP_EMISSION * 10**decimals()) / supply;
         if (i == nbSnapshots - 1) {
           //Current year XmasAirdrop are released lienarly over 12 month
           uint256 elapsedTime = Math.min(block.timestamp, (_nextXmasTimestamp - 1)) - _lastXmasTimestamp;
@@ -129,7 +129,7 @@ contract Rudolf is Ownable, ERC20, ERC20Snapshot, ERC20Pausable {
       uint256 balance = balanceOfAt(account, snapshotId);
       if (balance > 0) {
         uint256 supply = totalSupplyAt(snapshotId);
-        uint256 yearAmount = (balance * XMAS_AIRDROP_EMMISSION * 10**decimals()) / supply;
+        uint256 yearAmount = (balance * XMAS_AIRDROP_EMISSION * 10**decimals()) / supply;
         uint256 monthAmount = yearAmount / 12;
         uint256 elapsedTime = Math.min(block.timestamp, (_nextXmasTimestamp - 1)) - _lastXmasTimestamp;
         uint256 elapsedMonths = (elapsedTime / AVG_MONTH_IN_SECONDS) + 1;
