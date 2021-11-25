@@ -4,9 +4,9 @@ $Rudolf is the Xmas meme coin
 <br/>
 
 ## $Rudolf tokenomics:
-- Initial Supply: 4.2B $RUDOLF
-- Controlled inflation: 1.2B $RUDOLF / year
-- Innovative token emission model: 1.2B $RUDOLF airdrop to hodlers every Xmas! #XmasAirdrop
+- Initial Supply: 420B $RUDOLF
+- Controlled inflation: 120B $RUDOLF / year
+- Innovative token emission model: 120B $RUDOLF airdrop to hodlers every Xmas! #XmasAirdrop
 - Xmas Airdrop is linearly vested over 12 month to avoid supply choc
 - 0% fees
 
