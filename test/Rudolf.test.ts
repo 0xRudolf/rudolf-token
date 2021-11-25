@@ -11,7 +11,6 @@ let rudolf: Rudolf;
 let owner: SignerWithAddress;
 let user1: SignerWithAddress;
 let user2: SignerWithAddress;
-let user3: SignerWithAddress;
 let initialState: number;
 const decimals = 18;
 const withDecimals = (n: number | BigNumber): BigNumber => BigNumber.from(n).mul(BigNumber.from(10).pow(decimals));
@@ -24,7 +23,7 @@ const endOfYear = 360 * 24 * 3600;
 describe("Rudolf", () => {
   before(async () => {
     rudolfFactory = await ethers.getContractFactory("Rudolf");
-    [owner, user1, user2, user3] = await ethers.getSigners();
+    [owner, user1, user2] = await ethers.getSigners();
     initialState = await ethers.provider.send("evm_snapshot", []);
   });
 
@@ -182,7 +181,7 @@ describe("Rudolf", () => {
         user2ExpectedAirdrop = xmasAirDropAmount.mul(user2BalanceBeforeXmas).div(supply);
 
         await ethers.provider.send("evm_mine", [xmas2021 + endOfYear]); //go to endOfYear to get full airdrop allocation
-        await rudolf.transfer(user3.address, 1);
+        await rudolf.transfer(owner.address, 1);
       });
 
       it("Number of XmasAirdrop and SnapshotId are incremented", async () => {
@@ -259,22 +258,18 @@ describe("Rudolf", () => {
       context("When 4 more successive XmasAirdrop occurred", () => {
         beforeEach(async () => {
           let nextTime = await rudolf.getNextXmasAirdropTime();
-          await rudolf.connect(user3).transfer(owner.address, 1);
+          await rudolf.transfer(owner.address, 1);
           await ethers.provider.send("evm_mine", [nextTime]);
-          await rudolf.transfer(user3.address, 1);
-          await rudolf.connect(user3).transfer(owner.address, 1);
+          await rudolf.transfer(owner.address, 1);
           nextTime = await rudolf.getNextXmasAirdropTime();
           await ethers.provider.send("evm_mine", [nextTime]);
-          await rudolf.transfer(user3.address, 1);
-          await rudolf.connect(user3).transfer(owner.address, 1);
+          await rudolf.transfer(owner.address, 1);
           nextTime = await rudolf.getNextXmasAirdropTime();
           await ethers.provider.send("evm_mine", [nextTime]);
-          await rudolf.transfer(user3.address, 1);
-          await rudolf.connect(user3).transfer(owner.address, 1);
+          await rudolf.transfer(owner.address, 1);
           nextTime = await rudolf.getNextXmasAirdropTime();
           await ethers.provider.send("evm_mine", [nextTime + endOfYear]); //go to endOfYear to get full airdrop allocation
-          await rudolf.transfer(user3.address, 1);
-          await rudolf.connect(user3).transfer(owner.address, 1);
+          await rudolf.transfer(owner.address, 1);
         });
 
         it("Number of XmasAirdrop and SnapshotId are incremented", async () => {
@@ -326,6 +321,14 @@ describe("Rudolf", () => {
           expect(await rudolf.balanceOf(user2.address)).to.equal(user2Balance.add(user2ExpectedAirdrop.mul(5)));
         });
 
+        it("Successive claim are rejected", async () => {
+          const user1Balance = await rudolf.balanceOf(user1.address);
+          await rudolf.connect(user1).claimXmasAirdrop();
+          await expect(rudolf.connect(user1).claimXmasAirdrop()).to.be.revertedWith("RUDOLF: nothing to claim");
+          await expect(rudolf.connect(user1).claimXmasAirdrop()).to.be.revertedWith("RUDOLF: nothing to claim");
+          expect(await rudolf.balanceOf(user1.address)).to.equal(user1Balance.add(user1ExpectedAirdrop.mul(5)));
+        });
+
         it("Total supply is increase each time an account claim its airdrop", async () => {
           let claimedAmount: BigNumber = BigNumber.from(0);
           claimedAmount = claimedAmount.add(await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address));
@@ -358,9 +361,6 @@ describe("Rudolf", () => {
 
         let ownerExpected2ndAirdrop: BigNumber, user1Expected2ndAirdrop: BigNumber, user2Expected2ndAirdrop: BigNumber;
         beforeEach(async () => {
-          //retrieve the amount send to account 3 to reset owner balance
-          await rudolf.connect(user3).transfer(owner.address, 1);
-
           await rudolf.transfer(user1.address, withDecimals(1500000000)); //1.5B
           await rudolf.transfer(user2.address, withDecimals(500000000)); //0.5B
 
@@ -374,7 +374,7 @@ describe("Rudolf", () => {
 
           const nextTime = await rudolf.getNextXmasAirdropTime();
           await ethers.provider.send("evm_mine", [nextTime + endOfYear]); //go to endOfYear to get full airdrop allocation
-          await rudolf.transfer(user3.address, 1);
+          await rudolf.transfer(owner.address, 1);
         });
 
         it("Claimable XmasAirdrop amount are calculated based on each Xmas balances", async () => {
@@ -434,9 +434,6 @@ describe("Rudolf", () => {
 
         let ownerExpected2ndAirdrop: BigNumber, user1Expected2ndAirdrop: BigNumber, user2Expected2ndAirdrop: BigNumber;
         beforeEach(async () => {
-          //retrieve the amount send to account 3 to reset owner balance
-          await rudolf.connect(user3).transfer(owner.address, 1);
-
           await rudolf.claimXmasAirdrop();
           await rudolf.connect(user1).claimXmasAirdrop();
 
@@ -451,7 +448,7 @@ describe("Rudolf", () => {
 
           const nextTime = await rudolf.getNextXmasAirdropTime();
           await ethers.provider.send("evm_mine", [nextTime + endOfYear]); //go to endOfYear to get full airdrop allocation
-          await rudolf.transfer(user3.address, 1);
+          await rudolf.transfer(owner.address, 1);
         });
 
         it("Claimable XmasAirdrop amount are calculated based on each Xmas balances", async () => {
@@ -472,6 +469,14 @@ describe("Rudolf", () => {
 
           const user1Balance = await rudolf.balanceOf(user1.address);
           await rudolf.connect(user1).claimXmasAirdrop();
+          expect(await rudolf.balanceOf(user1.address)).to.equal(user1Balance.add(user1Expected2ndAirdrop));
+        });
+
+        it("Successive claim are rejected", async () => {
+          const user1Balance = await rudolf.balanceOf(user1.address);
+          await rudolf.connect(user1).claimXmasAirdrop();
+          await expect(rudolf.connect(user1).claimXmasAirdrop()).to.be.revertedWith("RUDOLF: nothing to claim");
+          await expect(rudolf.connect(user1).claimXmasAirdrop()).to.be.revertedWith("RUDOLF: nothing to claim");
           expect(await rudolf.balanceOf(user1.address)).to.equal(user1Balance.add(user1Expected2ndAirdrop));
         });
 

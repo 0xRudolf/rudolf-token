@@ -11,7 +11,6 @@ let rudolf: Rudolf;
 let owner: SignerWithAddress;
 let user1: SignerWithAddress;
 let user2: SignerWithAddress;
-let user3: SignerWithAddress;
 let initialState: number;
 const decimals = 18;
 const withDecimals = (n: number | BigNumber): BigNumber => BigNumber.from(n).mul(BigNumber.from(10).pow(decimals));
@@ -24,7 +23,7 @@ const yearInSeconds = 365 * 24 * 3600;
 describe("Rudolf Vesting", () => {
   before(async () => {
     rudolfFactory = await ethers.getContractFactory("Rudolf");
-    [owner, user1, user2, user3] = await ethers.getSigners();
+    [owner, user1, user2] = await ethers.getSigners();
     initialState = await ethers.provider.send("evm_snapshot", []);
   });
 
@@ -66,7 +65,7 @@ describe("Rudolf Vesting", () => {
         user2ExpectedAirdrop = xmasAirDropAmount.mul(user2BalanceBeforeXmas).div(supply);
 
         await ethers.provider.send("evm_mine", [xmas2021]);
-        await rudolf.transfer(user3.address, 1);
+        await rudolf.transfer(owner.address, 1);
       });
 
       it("Accounts have 1/12th of their XmasAirdrop directly claimable", async () => {
@@ -163,7 +162,7 @@ describe("Rudolf Vesting", () => {
       context("1 month later", () => {
         beforeEach(async () => {
           await ethers.provider.send("evm_mine", [xmas2021 + monthInSeconds * 1.1]);
-          await rudolf.transfer(user3.address, 1);
+          await rudolf.transfer(owner.address, 1);
         });
 
         it("Accounts have 2/12th of their XmasAirdrop directly claimable", async () => {
@@ -258,10 +257,111 @@ describe("Rudolf Vesting", () => {
         });
       });
 
+      context("When some users claimed their airdrop before another month", () => {
+        beforeEach(async () => {
+          await rudolf.claimXmasAirdrop();
+          await rudolf.connect(user1).claimXmasAirdrop();
+          await ethers.provider.send("evm_mine", [xmas2021 + monthInSeconds * 1.5]);
+          await rudolf.transfer(owner.address, 1);
+        });
+
+        it("Accounts that claimed before have 1/12th of their XmasAirdrop directly claimable", async () => {
+          const ownerAirdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address);
+          expect(withoutDecimals(ownerAirdrop)).to.equal(withoutDecimals(ownerExpectedAirdrop.div(12)));
+
+          const user1Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address);
+          expect(withoutDecimals(user1Airdrop)).to.equal(withoutDecimals(user1ExpectedAirdrop.div(12)));
+
+          const user2Airdrop = await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address);
+          expect(user2Airdrop).to.equal(user2ExpectedAirdrop.div(6));
+        });
+
+        it("Accounts can claim their airdrop", async () => {
+          const ownerBalance = await rudolf.balanceOf(owner.address);
+          await rudolf.claimXmasAirdrop();
+          expect(withoutDecimals(await rudolf.balanceOf(owner.address))).to.equal(
+            withoutDecimals(ownerBalance.add(ownerExpectedAirdrop.div(12)))
+          );
+
+          const user1Balance = await rudolf.balanceOf(user1.address);
+          await rudolf.connect(user1).claimXmasAirdrop();
+          expect(withoutDecimals(await rudolf.balanceOf(user1.address))).to.equal(
+            withoutDecimals(user1Balance.add(user1ExpectedAirdrop.div(12)))
+          );
+
+          const user2Balance = await rudolf.balanceOf(user2.address);
+          await rudolf.connect(user2).claimXmasAirdrop();
+          expect(await rudolf.balanceOf(user2.address)).to.equal(user2Balance.add(user2ExpectedAirdrop.div(6)));
+        });
+
+        it("User can only claim 2/12th of the airdrop yet", async () => {
+          await rudolf.connect(user1).claimXmasAirdrop();
+          await expect(rudolf.connect(user1).claimXmasAirdrop()).to.be.revertedWith("RUDOLF: nothing to claim");
+          await expect(rudolf.connect(user1).claimXmasAirdrop()).to.be.revertedWith("RUDOLF: nothing to claim");
+          expect(await rudolf.balanceOf(user1.address)).to.equal(
+            user1BalanceBeforeXmas.add(user1ExpectedAirdrop.div(6))
+          );
+        });
+
+        it("Total supply is increased up to 2/12th total XmasAirdrop emission", async () => {
+          await rudolf.claimXmasAirdrop();
+          await rudolf.connect(user1).claimXmasAirdrop();
+          await rudolf.connect(user2).claimXmasAirdrop();
+          expect(withoutDecimals(await rudolf.totalSupply())).to.equal(
+            withoutDecimals(supply.add(xmasAirDropAmount.div(6)))
+          );
+        });
+
+        it("Users have 10 more monthly vested airdrop", async () => {
+          let vestedAmounts: { releaseTime: BigNumber; amount: BigNumber }[];
+          vestedAmounts = await rudolf.getVestedXmasAirdropAmountForAccount(owner.address);
+          expect(vestedAmounts.length).to.equal(10);
+          vestedAmounts.forEach((v, i) => {
+            expect(v.amount).to.equal(ownerExpectedAirdrop.div(12));
+            expect(v.releaseTime).to.equal(BigNumber.from(xmas2021 + (i + 2) * monthInSeconds));
+          });
+
+          vestedAmounts = await rudolf.getVestedXmasAirdropAmountForAccount(user1.address);
+          expect(vestedAmounts.length).to.equal(10);
+          vestedAmounts.forEach((v, i) => {
+            expect(v.amount).to.equal(user1ExpectedAirdrop.div(12));
+            expect(v.releaseTime).to.equal(BigNumber.from(xmas2021 + (i + 2) * monthInSeconds));
+          });
+
+          vestedAmounts = await rudolf.getVestedXmasAirdropAmountForAccount(user2.address);
+          expect(vestedAmounts.length).to.equal(10);
+          vestedAmounts.forEach((v, i) => {
+            expect(v.amount).to.equal(user2ExpectedAirdrop.div(12));
+            expect(v.releaseTime).to.equal(BigNumber.from(xmas2021 + (i + 2) * monthInSeconds));
+          });
+        });
+
+        it("Total supply + total claimable + total vested is equal to total supply + XmasAirdrop emission", async () => {
+          let totalVested = BigNumber.from(0);
+          let vestedAmounts: { releaseTime: BigNumber; amount: BigNumber }[];
+          vestedAmounts = await rudolf.getVestedXmasAirdropAmountForAccount(owner.address);
+          vestedAmounts.forEach((v) => (totalVested = totalVested.add(v.amount)));
+          vestedAmounts = await rudolf.getVestedXmasAirdropAmountForAccount(user1.address);
+          vestedAmounts.forEach((v) => (totalVested = totalVested.add(v.amount)));
+          vestedAmounts = await rudolf.getVestedXmasAirdropAmountForAccount(user2.address);
+          vestedAmounts.forEach((v) => (totalVested = totalVested.add(v.amount)));
+
+          let totalClaimable = BigNumber.from(0);
+          totalClaimable = totalClaimable.add(await rudolf.getClaimableXmasAirdropAmountForAccount(owner.address));
+          totalClaimable = totalClaimable.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user1.address));
+          totalClaimable = totalClaimable.add(await rudolf.getClaimableXmasAirdropAmountForAccount(user2.address));
+
+          const currentSupply = await rudolf.totalSupply();
+          expect(withoutDecimals(currentSupply.add(totalClaimable.add(totalVested)))).to.equal(
+            withoutDecimals(supply.add(xmasAirDropAmount))
+          );
+        });
+      });
+
       context("5 month later", () => {
         beforeEach(async () => {
           await ethers.provider.send("evm_mine", [xmas2021 + monthInSeconds * 5]);
-          await rudolf.transfer(user3.address, 1);
+          await rudolf.transfer(owner.address, 1);
         });
 
         it("Accounts have half of their XmasAirdrop directly claimable", async () => {
@@ -359,7 +459,7 @@ describe("Rudolf Vesting", () => {
       context("10 month later", () => {
         beforeEach(async () => {
           await ethers.provider.send("evm_mine", [xmas2021 + monthInSeconds * 10.2]);
-          await rudolf.transfer(user3.address, 1);
+          await rudolf.transfer(owner.address, 1);
         });
 
         it("Accounts have 11/12th of their XmasAirdrop directly claimable", async () => {
@@ -465,7 +565,7 @@ describe("Rudolf Vesting", () => {
       context("12 month later, before New Xmas Airdrop", () => {
         beforeEach(async () => {
           await ethers.provider.send("evm_mine", [xmas2021 + monthInSeconds * 12 - 3600]);
-          await rudolf.transfer(user3.address, 1);
+          await rudolf.transfer(owner.address, 1);
         });
 
         it("Accounts have all of their XmasAirdrop directly claimable", async () => {
@@ -527,9 +627,6 @@ describe("Rudolf Vesting", () => {
 
         let ownerExpected2ndAirdrop: BigNumber, user1Expected2ndAirdrop: BigNumber, user2Expected2ndAirdrop: BigNumber;
         beforeEach(async () => {
-          //retrieve the amount send to account 3 to reset owner balance
-          await rudolf.connect(user3).transfer(owner.address, 1);
-
           await rudolf.transfer(user1.address, withDecimals(1500000000)); //1.5B
           await rudolf.transfer(user2.address, withDecimals(500000000)); //0.5B
 
@@ -543,7 +640,7 @@ describe("Rudolf Vesting", () => {
 
           //trigger next xmas airdrop
           await ethers.provider.send("evm_mine", [xmas2021 + yearInSeconds]);
-          await rudolf.transfer(user3.address, 1);
+          await rudolf.transfer(owner.address, 1);
         });
 
         it("Accounts have 1st Airdrop + 11/12th of 2nd Airdrop directly claimable", async () => {
