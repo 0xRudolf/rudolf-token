@@ -15,8 +15,8 @@ let initialState: number;
 const decimals = 18;
 const withDecimals = (n: number | BigNumber): BigNumber => BigNumber.from(n).mul(BigNumber.from(10).pow(decimals));
 const withoutDecimals = (n: BigNumber): number => parseFloat(ethers.utils.formatUnits(n, decimals));
-const supply: BigNumber = withDecimals(4200000000);
-const xmasAirDropAmount: BigNumber = withDecimals(1200000000);
+const supply: BigNumber = withDecimals(420_000_000_000);
+const xmasAirDropAmount: BigNumber = withDecimals(120_000_000_000);
 const xmas2021 = 1640390400;
 const yearInSeconds = 365 * 24 * 3600;
 const endOfYear = 360 * 24 * 3600;
@@ -169,8 +169,8 @@ describe("Rudolf", () => {
       let ownerBalanceBeforeXmas: BigNumber, user1BalanceBeforeXmas: BigNumber, user2BalanceBeforeXmas: BigNumber;
       let ownerExpectedAirdrop: BigNumber, user1ExpectedAirdrop: BigNumber, user2ExpectedAirdrop: BigNumber;
       beforeEach(async () => {
-        await rudolf.transfer(user1.address, withDecimals(1000000000)); // 1B
-        await rudolf.transfer(user2.address, withDecimals(100000000)); // 0.1B
+        await rudolf.transfer(user1.address, withDecimals(1_000_000_000)); // 1B
+        await rudolf.transfer(user2.address, withDecimals(100_000_000)); // 0.1B
 
         ownerBalanceBeforeXmas = await rudolf.balanceOf(owner.address);
         user1BalanceBeforeXmas = await rudolf.balanceOf(user1.address);
@@ -361,8 +361,8 @@ describe("Rudolf", () => {
 
         let ownerExpected2ndAirdrop: BigNumber, user1Expected2ndAirdrop: BigNumber, user2Expected2ndAirdrop: BigNumber;
         beforeEach(async () => {
-          await rudolf.transfer(user1.address, withDecimals(1500000000)); //1.5B
-          await rudolf.transfer(user2.address, withDecimals(500000000)); //0.5B
+          await rudolf.transfer(user1.address, withDecimals(1_500_000_000)); //1.5B
+          await rudolf.transfer(user2.address, withDecimals(500_000_000)); //0.5B
 
           ownerBalanceBefore2ndXmas = await rudolf.balanceOf(owner.address);
           user1BalanceBefore2ndXmas = await rudolf.balanceOf(user1.address);
