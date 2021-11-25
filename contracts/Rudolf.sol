@@ -149,7 +149,7 @@ contract Rudolf is Ownable, ERC20, ERC20Snapshot, ERC20Pausable {
     _checkXmasAirdrop();
     uint256 amount = getClaimableXmasAirdropAmountForAccount(msg.sender);
     require(amount != 0, "RUDOLF: nothing to claim");
-    _claimedXmasAirdrop[msg.sender] = amount;
+    _claimedXmasAirdrop[msg.sender] = _claimedXmasAirdrop[msg.sender] + amount;
     _mint(msg.sender, amount);
   }
 }
