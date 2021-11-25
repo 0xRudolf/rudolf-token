@@ -8,13 +8,11 @@ let rudolfFactory: Rudolf__factory;
 let rudolf: Rudolf;
 let owner: SignerWithAddress;
 let user1: SignerWithAddress;
-let user2: SignerWithAddress;
-let user3: SignerWithAddress;
 let initialState: number;
 describe("Rudolf Pause", () => {
   before(async () => {
     rudolfFactory = await ethers.getContractFactory("Rudolf");
-    [owner, user1, user2, user3] = await ethers.getSigners();
+    [owner, user1] = await ethers.getSigners();
     initialState = await ethers.provider.send("evm_snapshot", []);
   });
 
